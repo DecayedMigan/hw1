@@ -1,4 +1,5 @@
 """Core data structures."""
+
 import needle
 from .backend_numpy import Device, cpu, all_devices
 from typing import List, Optional, NamedTuple, Tuple, Union, Dict
@@ -15,6 +16,7 @@ TENSOR_COUNTER = 0
 # as the backend for our computations, this line will change in later homeworks
 
 import numpy as array_api
+
 NDArray = numpy.ndarray
 
 
@@ -247,9 +249,9 @@ class Tensor(Value):
         tensor._init(
             None,
             [],
-            cached_data=data
-            if not isinstance(data, Tensor)
-            else data.realize_cached_data(),
+            cached_data=(
+                data if not isinstance(data, Tensor) else data.realize_cached_data()
+            ),
             requires_grad=requires_grad,
         )
         return tensor
@@ -362,8 +364,6 @@ class Tensor(Value):
     __rmul__ = __mul__
 
 
-
-
 def compute_gradient_of_variables(output_tensor, out_grad):
     """Take gradient of output node with respect to each node in node_list.
 
@@ -380,7 +380,16 @@ def compute_gradient_of_variables(output_tensor, out_grad):
     reverse_topo_order = list(reversed(find_topo_sort([output_tensor])))
 
     ### BEGIN YOUR SOLUTION
-    raise NotImplementedError()
+    for i in reverse_topo_order:
+        v_i = sum_node_list(node_to_output_grads_list[i])
+        i.grad = v_i
+
+        if not i.inputs:
+            continue
+
+        grads = i.op.gradient_as_tuple(v_i, i)
+        for k, g in zip(i.inputs, grads):
+            node_to_output_grads_list.setdefault(k, []).append(g)
     ### END YOUR SOLUTION
 
 
@@ -393,14 +402,24 @@ def find_topo_sort(node_list: List[Value]) -> List[Value]:
     sort.
     """
     ### BEGIN YOUR SOLUTION
-    raise NotImplementedError()
+    visited = set()
+    topo_order = []
+    for node in node_list:
+        topo_sort_dfs(node, visited, topo_order)
+    return topo_order
     ### END YOUR SOLUTION
 
 
 def topo_sort_dfs(node, visited, topo_order):
     """Post-order DFS"""
     ### BEGIN YOUR SOLUTION
-    raise NotImplementedError()
+    if node in visited:
+        return
+    visited.add(node)
+
+    for inp in node.inputs:
+        topo_sort_dfs(inp, visited, topo_order)
+    topo_order.append(node)
     ### END YOUR SOLUTION
 
 
