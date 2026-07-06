@@ -26,15 +26,27 @@ def parse_mnist(image_filename, label_filename):
                 dimension of the data, e.g., since MNIST images are 28x28, it
                 will be 784.  Values should be of type np.float32, and the data
                 should be normalized to have a minimum value of 0.0 and a
-                maximum value of 1.0.
+                maximum value of 1.0 (i.e., scale original values of 0 to 0.0
+                and 255 to 1.0).
 
-            y (numpy.ndarray[dypte=np.int8]): 1D numpy array containing the
-                labels of the examples.  Values should be of type np.int8 and
+            y (numpy.ndarray[dtype=np.uint8]): 1D numpy array containing the
+                labels of the examples.  Values should be of type np.uint8 and
                 for MNIST will contain the values 0-9.
     """
-    ### BEGIN YOUR SOLUTION
-    raise NotImplementedError()
-    ### END YOUR SOLUTION
+    ### BEGIN YOUR CODE
+    with gzip.open(image_filename, "rb") as f:
+        magic, num, rows, cols = struct.unpack(">IIII", f.read(16))
+        pixels = np.frombuffer(f.read(), dtype=np.uint8)
+        X = pixels.reshape(num, rows * cols)
+        X = X.astype(np.float32) / 255.0
+
+    with gzip.open(label_filename, "rb") as f:
+        magic = struct.unpack(">I", f.read(4))[0]
+        num = struct.unpack(">I", f.read(4))[0]
+
+        y = np.frombuffer(f.read(), dtype=np.uint8)
+    return (X, y)
+    ### END YOUR CODE
 
 
 def softmax_loss(Z, y_one_hot):
@@ -54,7 +66,21 @@ def softmax_loss(Z, y_one_hot):
         Average softmax loss over the sample. (ndl.Tensor[np.float32])
     """
     ### BEGIN YOUR SOLUTION
-    raise NotImplementedError()
+    m = Z.shape[0]
+    log_sum_exp = ndl.log(ndl.summation(ndl.exp(Z), axes=(1,)))
+    correct_logits = ndl.summation(Z * y_one_hot, axes=(1,))
+    return ndl.summation(log_sum_exp - correct_logits) / m
+
+    # Z -= np.max(Z, axis=1, keepdims=True)
+    z = np.exp(Z)
+    s = np.sum(z, axis=1)
+    log_sum_exp = np.log(s)
+
+    logits = Z[np.arange(Z.shape[0]), y_one_hot]
+
+    loss = np.mean(log_sum_exp - logits)
+    loss = ndl.Tensor()
+    return loss
     ### END YOUR SOLUTION
 
 
@@ -83,7 +109,39 @@ def nn_epoch(X, y, W1, W2, lr=0.1, batch=100):
     """
 
     ### BEGIN YOUR SOLUTION
-    raise NotImplementedError()
+    m = X.shape[0]
+    for start in range(0, m, batch):
+        end = min(start + batch, m)
+
+        X_batch = X[start:end]
+        y_batch = y[start:end]
+        b = X_batch.shape[0]
+
+        # forward
+        H_pre = X_batch @ W1  # (b, h)
+        Z1 = np.maximum(0, H_pre)  # (b, h)
+
+        logits = Z1 @ W2  # (b, k)
+
+        # stable softmax
+        logits = logits - np.max(logits, axis=1, keepdims=True)
+        exp_logits = np.exp(logits)
+        probs = exp_logits / np.sum(exp_logits, axis=1, keepdims=True)  # (b, k)
+
+        # one-hot
+        I_y = np.zeros_like(probs)  # (b, k)
+        I_y[np.arange(b), y_batch] = 1
+
+        # backward
+        G2 = probs - I_y  # (b, k)
+        G1 = (H_pre > 0) * (G2 @ W2.T)  # (b, h)
+
+        grad_W1 = X_batch.T @ G1 / b  # (n, h)
+        grad_W2 = Z1.T @ G2 / b  # (h, k)
+
+        W1 -= lr * grad_W1
+        W2 -= lr * grad_W2
+
     ### END YOUR SOLUTION
 
 
