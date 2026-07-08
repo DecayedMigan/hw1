@@ -70,17 +70,6 @@ def softmax_loss(Z, y_one_hot):
     log_sum_exp = ndl.log(ndl.summation(ndl.exp(Z), axes=(1,)))
     correct_logits = ndl.summation(Z * y_one_hot, axes=(1,))
     return ndl.summation(log_sum_exp - correct_logits) / m
-
-    # Z -= np.max(Z, axis=1, keepdims=True)
-    z = np.exp(Z)
-    s = np.sum(z, axis=1)
-    log_sum_exp = np.log(s)
-
-    logits = Z[np.arange(Z.shape[0]), y_one_hot]
-
-    loss = np.mean(log_sum_exp - logits)
-    loss = ndl.Tensor()
-    return loss
     ### END YOUR SOLUTION
 
 
@@ -110,38 +99,29 @@ def nn_epoch(X, y, W1, W2, lr=0.1, batch=100):
 
     ### BEGIN YOUR SOLUTION
     m = X.shape[0]
+    num_classes = W2.shape[1]
     for start in range(0, m, batch):
         end = min(start + batch, m)
 
-        X_batch = X[start:end]
-        y_batch = y[start:end]
-        b = X_batch.shape[0]
+        X_batch_np = X[start:end]
+        y_batch_np = y[start:end]
+        b = X_batch_np.shape[0]
 
-        # forward
-        H_pre = X_batch @ W1  # (b, h)
-        Z1 = np.maximum(0, H_pre)  # (b, h)
+        X_batch = ndl.Tensor(X_batch_np)
+        y_one_hot_np = np.zeros((b, num_classes))
+        y_one_hot_np[np.arange(b), y_batch_np] = 1
 
-        logits = Z1 @ W2  # (b, k)
+        y_one_hot = ndl.Tensor(y_one_hot_np)
 
-        # stable softmax
-        logits = logits - np.max(logits, axis=1, keepdims=True)
-        exp_logits = np.exp(logits)
-        probs = exp_logits / np.sum(exp_logits, axis=1, keepdims=True)  # (b, k)
+        logits = ndl.matmul(ndl.relu(ndl.matmul(X_batch, W1)), W2)
+        loss = softmax_loss(logits, y_one_hot)
 
-        # one-hot
-        I_y = np.zeros_like(probs)  # (b, k)
-        I_y[np.arange(b), y_batch] = 1
+        loss.backward()
 
-        # backward
-        G2 = probs - I_y  # (b, k)
-        G1 = (H_pre > 0) * (G2 @ W2.T)  # (b, h)
+        W2 = ndl.Tensor(W2.numpy() - lr * W2.grad.numpy())
+        W1 = ndl.Tensor(W1.numpy() - lr * W1.grad.numpy())
 
-        grad_W1 = X_batch.T @ G1 / b  # (n, h)
-        grad_W2 = Z1.T @ G2 / b  # (h, k)
-
-        W1 -= lr * grad_W1
-        W2 -= lr * grad_W2
-
+    return W1, W2
     ### END YOUR SOLUTION
 
 

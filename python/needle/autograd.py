@@ -380,12 +380,12 @@ def compute_gradient_of_variables(output_tensor, out_grad):
     reverse_topo_order = list(reversed(find_topo_sort([output_tensor])))
 
     ### BEGIN YOUR SOLUTION
-    for i in reverse_topo_order:
-        v_i = sum_node_list(node_to_output_grads_list[i])
+    for i in reverse_topo_order:  # i is a node
+        v_i = sum_node_list(node_to_output_grads_list[i])  # vi is a loss. number
         i.grad = v_i
 
         if not i.inputs:
-            continue
+            continue  # leaf node
 
         grads = i.op.gradient_as_tuple(v_i, i)
         for k, g in zip(i.inputs, grads):
